@@ -1,30 +1,32 @@
 # Codex_gen_docs
 
-This repository provides a simple tool to generate documentation for Python
-projects and view the result in a lightweight React front-end.
+Generate Markdown documentation for Python projects and view it in the browser.
 
-## Generating documentation
+## Usage
 
-Use the CLI to scan a directory and write Markdown documentation to the
-`output/` folder:
+1. **Generate docs**
 
-```bash
-python generate_docs.py path/to/project -o output
-```
+   ```bash
+   python generate_docs.py path/to/project -o output
+   ```
 
-The script walks the given directory, creates summaries and example docstrings
-for all Python files and writes a Markdown file for each one. An `index.json`
-file is also produced so the front-end can list the generated pages.
+   The script scans the target directory for `*.py` files and writes a set of
+   Markdown files to the `output/` folder.
 
-## Viewing the documentation
+2. **View docs**
 
-A minimal React application is located under `frontend/`. To preview the
-documentation open a simple HTTP server in that directory:
+   Serve the `frontend/` folder with any static file server:
 
-```bash
-cd frontend
-python -m http.server 8000
-```
+   ```bash
+   cd frontend
+   python -m http.server 8000
+   ```
 
-Then visit `http://localhost:8000` in your browser. The app will load the
-Markdown files from `../output/` and render them.
+   Open `http://localhost:8000` in your browser to view the generated
+   documentation.
+
+## Customising AI integration
+
+The current implementation uses placeholder text for file summaries and
+function docstrings. Update `generator/doc_generator.py` to call your AI
+service in `_summarize_file` and `_generate_docstring` if desired.
