@@ -1,6 +1,13 @@
+import os
 import ast
+import json
 from pathlib import Path
 from typing import List
+
+try:
+    import openai
+except ImportError:  # pragma: no cover - openai optional
+    openai = None
 
 
 class DocGenerator:
@@ -20,7 +27,7 @@ class DocGenerator:
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
         py_files = self._find_python_files()
-        index_lines = ["# Project Documentation", ""]
+        written = []
         for file_path in py_files:
             rel_path = file_path.relative_to(self.root_path)
             summary = self._summarize_file(file_path)
@@ -28,17 +35,30 @@ class DocGenerator:
             doc_lines += self._extract_docstrings(file_path)
             out_file = self.output_dir / f"{file_path.stem}.md"
             out_file.write_text("\n".join(doc_lines))
-            index_lines.append(f"- [{rel_path}]({out_file.name})")
-        (self.output_dir / "index.md").write_text("\n".join(index_lines))
+            written.append(out_file.name)
+        # Write index for front-end to load
+        index_file = self.output_dir / "index.json"
+        index_file.write_text(json.dumps(written))
 
     def _find_python_files(self) -> List[Path]:
-        return list(self.root_path.rglob("*.py"))
+        """Recursively gather all Python files under root_path."""
+        return [p for p in self.root_path.rglob('*.py') if p.is_file()]
 
     def _summarize_file(self, path: Path) -> str:
-        """Return a placeholder summary for ``path``."""
-        return f"Summary for {path.name}."
+        """Return a short summary of a Python file using OpenAI if available."""
+        code = path.read_text()
+        if openai and os.environ.get('OPENAI_API_KEY'):
+            prompt = f"Summarize the following Python code:\n\n{code}"
+            resp = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.choices[0].message.content.strip()
+        # Fallback simple summary
+        return f"Auto generated summary for {path.name}."
 
     def _extract_docstrings(self, path: Path) -> List[str]:
+        """Extract and format docstrings from Python file."""
         tree = ast.parse(path.read_text(), filename=str(path))
         lines: List[str] = []
         for node in ast.walk(tree):
@@ -50,16 +70,19 @@ class DocGenerator:
         return lines
 
     def _generate_docstring(self, node: ast.AST) -> str:
-        """Return a placeholder Google-style docstring for ``node``."""
-        return f"""{node.name}
+        """Create a Google style docstring for *node*."""
+        if isinstance(node, ast.FunctionDef):
+            args = [a.arg for a in node.args.args]
+            params = "\n".join(f"    {a}: TODO" for a in args)
+            return f'"""TODO: Describe {node.name}.\n\nArgs:\n{params}\n"""'
+        if isinstance(node, ast.ClassDef):
+            return '"""TODO: Describe class."""'
+        return '"""TODO"""'
 
-Auto-generated description for {node.name}.
 
-Args:
-    *args: Positional arguments.
-    **kwargs: Keyword arguments.
-
-Returns:
-    Any: Description of return value.
-"""
+# Backward compatibility function
+def generate_docs(target: Path, output_dir: Path) -> None:
+    """Generate documentation for all Python files under *target*."""
+    generator = DocGenerator(str(target), str(output_dir))
+    generator.generate()
 
